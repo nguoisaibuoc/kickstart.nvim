@@ -1,38 +1,58 @@
 local gh = require('utils').gh
 
--- [[ Snippet Engine ]]
+-- Helper function to check if there is a word before the cursor
+local function has_words_before()
+  local line, col = unpack(vim.api.nvim_win_get_cursor(0))
+  return col ~= 0 and vim.api.nvim_buf_get_lines(0, line - 1, line, true)[1]:sub(col, col):match '%s' == nil
+end
 
--- NOTE: You can also specify plugin using a version range for its git tag.
---  See `:help vim.version.range()` for more info
+-- Snippet Engine
 vim.pack.add { { src = gh 'L3MON4D3/LuaSnip', version = vim.version.range '2.*' } }
 require('luasnip').setup {}
 
--- `friendly-snippets` contains a variety of premade snippets.
---    See the README about individual language/framework/plugin snippets:
---    https://github.com/rafamadriz/friendly-snippets
---
--- vim.pack.add { gh 'rafamadriz/friendly-snippets' }
--- require('luasnip.loaders.from_vscode').lazy_load()
-
--- [[ Autocomplete Engine ]]
+-- Autocomplete Engine
 vim.pack.add { { src = gh 'saghen/blink.cmp', version = vim.version.range '1.*' } }
 require('blink.cmp').setup {
   keymap = {
     preset = 'default',
+
+    ['<Tab>'] = {
+      function(cmp)
+        -- If the popup is visible, select the next item
+        if cmp.is_visible() then return cmp.select_next() end
+        return false -- Proceed to next handler
+      end,
+      -- If inside a snippet, use tab to jump to the next placeholder
+      'snippet_forward',
+      function(cmp)
+        -- If there is a word before the cursor, show the autocomplete popup
+        if has_words_before() then return cmp.show() end
+        return false
+      end,
+      -- Otherwise, act like a normal Tab (indent)
+      'fallback',
+    },
+
+    ['<S-Tab>'] = {
+      function(cmp)
+        if cmp.is_visible() then return cmp.select_prev() end
+        return false
+      end,
+      'snippet_backward',
+      'fallback',
+    },
+
     ['<C-j>'] = { 'select_next', 'fallback' },
     ['<C-k>'] = { 'select_prev', 'fallback' },
   },
 
   appearance = {
-    -- 'mono' (default) for 'Nerd Font Mono' or 'normal' for 'Nerd Font'
-    -- Adjusts spacing to ensure icons are aligned
     nerd_font_variant = 'mono',
   },
 
   completion = {
-    -- By default, you may press `<c-space>` to show the documentation.
-    -- Optionally, set `auto_show = true` to show the documentation after a delay.
-    documentation = { auto_show = true, auto_show_delay_ms = 500 },
+    menu = { auto_show = false },
+    documentation = { auto_show = false, auto_show_delay_ms = 500 },
   },
 
   sources = {
@@ -40,16 +60,6 @@ require('blink.cmp').setup {
   },
 
   snippets = { preset = 'luasnip' },
-
-  -- Blink.cmp includes an optional, recommended rust fuzzy matcher,
-  -- which automatically downloads a prebuilt binary when enabled.
-  --
-  -- By default, we use the Lua implementation instead, but you may enable
-  -- the rust implementation via `'prefer_rust_with_warning'`
-  --
-  -- See `:help blink-cmp-config-fuzzy` for more information
   fuzzy = { implementation = 'lua' },
-
-  -- Shows a signature help window while you type arguments for a function
   signature = { enabled = true },
 }
